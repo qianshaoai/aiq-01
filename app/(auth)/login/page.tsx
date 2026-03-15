@@ -41,9 +41,9 @@ function LoginPage() {
       }
 
       if (data.mustChangePassword) {
-        router.push("/change-password?first=1");
+        window.location.href = "/change-password?first=1";
       } else {
-        router.push("/");
+        window.location.href = "/tasks";
       }
     } catch {
       setError("网络异常，请稍后重试");

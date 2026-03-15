@@ -116,6 +116,12 @@ export function WorkspaceShell({ task, userId, enterpriseId }: {
   const [currentPhase, setCurrentPhase] = useState<TaskPhase>(getPhase(task.status));
   const [taskStatus, setTaskStatus] = useState<TaskStatus>(task.status);
   const [breakpoint, setBreakpoint] = useState<BreakpointType>(null);
+  const [confirmedStages, setConfirmedStages] = useState<Set<string>>(
+    () => new Set(task.stageRecords.map((s) => s.stageType as string))
+  );
+  // Refs so memoized streamAI callback can read latest values without stale closure
+  const confirmedStagesRef = useRef<Set<string>>(new Set(task.stageRecords.map((s) => s.stageType as string)));
+  const taskStatusRef = useRef<TaskStatus>(task.status);
   const [rightPanelExpanded, setRightPanelExpanded] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -244,15 +250,18 @@ export function WorkspaceShell({ task, userId, enterpriseId }: {
 
   function checkBreakpoint(content: string, phase: TaskPhase) {
     // 执行阶段：根据内容长度和关键词检测断点
-    if (phase === "EXECUTING" && taskStatus === "EXECUTING") {
+    // Use refs to avoid stale closure in memoized streamAI callback
+    if (phase === "EXECUTING" && taskStatusRef.current === "EXECUTING") {
       // 断点1：方向确认
-      if (!task.stageRecords.find((s) => s.stageType === "DIRECTION")) {
+      if (!confirmedStagesRef.current.has("DIRECTION")) {
         setBreakpoint("DIRECTION");
         setTaskStatus("PENDING_DIRECTION");
-      } else if (!task.stageRecords.find((s) => s.stageType === "DRAFT")) {
+        taskStatusRef.current = "PENDING_DIRECTION";
+      } else if (!confirmedStagesRef.current.has("DRAFT")) {
         // 断点2：初稿确认
         setBreakpoint("DRAFT");
         setTaskStatus("PENDING_DRAFT");
+        taskStatusRef.current = "PENDING_DRAFT";
       }
     }
   }
@@ -304,8 +313,14 @@ export function WorkspaceShell({ task, userId, enterpriseId }: {
         return;
       }
 
+      // Record confirmed stage so breakpoint won't re-trigger
+      const newConfirmed = new Set([...confirmedStagesRef.current, stageType]);
+      confirmedStagesRef.current = newConfirmed;
+      setConfirmedStages(newConfirmed);
+
       setBreakpoint(null);
       setTaskStatus("EXECUTING");
+      taskStatusRef.current = "EXECUTING";
       setCurrentPhase("EXECUTING");
 
       const confirmMsg: Message = {
@@ -502,7 +517,7 @@ export function WorkspaceShell({ task, userId, enterpriseId }: {
                     { key: "DRAFT", label: "初稿确认" },
                     { key: "DELIVERY", label: "结果交付" },
                   ].map(({ key, label }) => {
-                    const done = task.stageRecords.some((s) => s.stageType === key);
+                    const done = confirmedStages.has(key);
                     const active = currentPhase === "EXECUTING" && !done && key === "DIRECTION"
                       || breakpoint === key;
                     return (

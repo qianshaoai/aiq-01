@@ -23,11 +23,6 @@ export default async function WorkspacePage({ params }: Params) {
 
   if (!task) notFound();
 
-  // 如果任务已完成，重定向到结果页
-  if (task.status === "COMPLETED") {
-    redirect(`/task/${taskId}/result`);
-  }
-
   return (
     <WorkspaceShell
       task={{

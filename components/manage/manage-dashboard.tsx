@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -299,7 +299,7 @@ function MembersTab() {
   const [page, setPage] = useState(1);
   const [acting, setActing] = useState<string | null>(null);
 
-  useState(() => { fetchMembers(); });
+  useEffect(() => { fetchMembers(); }, [search, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function fetchMembers() {
     setLoading(true);
@@ -310,7 +310,7 @@ function MembersTab() {
       const res = await fetch(`/api/manage/members?${qs}`);
       if (!res.ok) return;
       const data = await res.json();
-      setMembers(data.members ?? data.users ?? []);
+      setMembers(data.members ?? []);
       setTotal(data.total ?? 0);
     } finally {
       setLoading(false);
@@ -344,7 +344,7 @@ function MembersTab() {
             placeholder="搜索成员姓名"
             className="pl-8 h-8 text-sm"
             value={search}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1); fetchMembers(); }}
+            onChange={(e: React.ChangeEvent<HTMLInputElement>) => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
       </div>
@@ -415,9 +415,9 @@ function MembersTab() {
 
       {pageCount > 1 && (
         <div className="flex justify-center gap-2">
-          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => { setPage(page - 1); fetchMembers(); }}>上一页</Button>
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>上一页</Button>
           <span className="flex items-center text-sm text-muted-foreground px-2">{page} / {pageCount}</span>
-          <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => { setPage(page + 1); fetchMembers(); }}>下一页</Button>
+          <Button variant="outline" size="sm" disabled={page >= pageCount} onClick={() => setPage(page + 1)}>下一页</Button>
         </div>
       )}
     </div>
