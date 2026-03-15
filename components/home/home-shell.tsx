@@ -18,7 +18,7 @@ import {
   AlertCircle,
   ChevronRight,
 } from "lucide-react";
-import type { TaskStatus, TaskType, UserRole, UserStatus } from "@/lib/generated/prisma";
+import type { TaskStatus, TaskType, UserRole, UserStatus } from "@/lib/generated/prisma/client";
 
 interface RecentTask {
   id: string;

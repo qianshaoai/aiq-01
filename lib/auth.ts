@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
 import { prisma } from "./prisma";
-import type { UserRole, UserStatus } from "@/lib/generated/prisma";
+import type { UserRole, UserStatus } from "@/lib/generated/prisma/client";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? "7d";

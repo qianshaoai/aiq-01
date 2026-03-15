@@ -12,7 +12,7 @@ import {
   Copy, Download, ChevronDown, ChevronUp, ArrowRight,
   Plus, BookOpen, Building2, CheckCircle2, Clock,
 } from "lucide-react";
-import type { TaskType, StageType } from "@/lib/generated/prisma";
+import type { TaskType, StageType } from "@/lib/generated/prisma/client";
 
 interface StageRecord {
   stageType: StageType;

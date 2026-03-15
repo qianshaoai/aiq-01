@@ -14,7 +14,7 @@ import {
   Send, Loader2, CheckCircle, RotateCcw, Edit3,
   FileText, ChevronDown, ChevronUp, Save,
 } from "lucide-react";
-import type { TaskStatus, TaskType, StageType } from "@/lib/generated/prisma";
+import type { TaskStatus, TaskType, StageType } from "@/lib/generated/prisma/client";
 import type { TaskPhase } from "@/lib/ai/types";
 
 interface Material {

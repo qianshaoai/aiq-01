@@ -19,7 +19,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Users, CheckCircle2, Activity, ClipboardList, Link as LinkIcon, Plus, Search } from "lucide-react";
-import type { UserRole } from "@/lib/generated/prisma";
+import type { UserRole } from "@/lib/generated/prisma/client";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
