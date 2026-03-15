@@ -13,7 +13,7 @@ export interface GatewayOptions {
 export type GatewayFn = (options: GatewayOptions) => AsyncIterable<string>;
 
 export interface AIProviderSettings {
-  provider: "ANTHROPIC" | "OPENAI" | "GEMINI";
+  provider: "ANTHROPIC" | "OPENAI" | "GEMINI" | "DEEPSEEK" | "DOUBAO" | "QIANWEN" | "MINIMAX" | "KIMI";
   apiKey: string;
   modelName: string;
   baseUrl?: string;

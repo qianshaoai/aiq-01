@@ -31,12 +31,31 @@ export async function* sendMessage(
   systemPrompt: string,
   enterpriseId: string
 ): AsyncIterable<string> {
-  const settings = await getActiveProviderSettings(enterpriseId);
+  let settings = await getActiveProviderSettings(enterpriseId);
+
+  // Chinese providers use OpenAI-compatible APIs — inject default baseUrl if not set
+  const OPENAI_COMPAT_BASE_URLS: Partial<Record<typeof settings.provider, string>> = {
+    DEEPSEEK: "https://api.deepseek.com/v1",
+    DOUBAO:   "https://ark.volces.com/api/v3",
+    QIANWEN:  "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    MINIMAX:  "https://api.minimax.chat/v1",
+    KIMI:     "https://api.moonshot.cn/v1",
+  };
+
+  const defaultBase = OPENAI_COMPAT_BASE_URLS[settings.provider];
+  if (defaultBase && !settings.baseUrl) {
+    settings = { ...settings, baseUrl: defaultBase };
+  }
 
   const streamFn = {
     ANTHROPIC: anthropicStream,
     OPENAI: openaiStream,
     GEMINI: geminiStream,
+    DEEPSEEK: openaiStream,
+    DOUBAO:   openaiStream,
+    QIANWEN:  openaiStream,
+    MINIMAX:  openaiStream,
+    KIMI:     openaiStream,
   }[settings.provider];
 
   if (!streamFn) {

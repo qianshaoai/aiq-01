@@ -28,6 +28,7 @@ const PROVIDERS = [
     defaultModel: "claude-sonnet-4-6",
     modelPlaceholder: "claude-sonnet-4-6",
     showBaseUrl: false,
+    defaultBaseUrl: "",
   },
   {
     key: "OPENAI",
@@ -36,6 +37,7 @@ const PROVIDERS = [
     defaultModel: "gpt-4o",
     modelPlaceholder: "gpt-4o",
     showBaseUrl: true,
+    defaultBaseUrl: "",
   },
   {
     key: "GEMINI",
@@ -44,6 +46,52 @@ const PROVIDERS = [
     defaultModel: "gemini-2.0-flash",
     modelPlaceholder: "gemini-2.0-flash",
     showBaseUrl: false,
+    defaultBaseUrl: "",
+  },
+  {
+    key: "DEEPSEEK",
+    label: "DeepSeek",
+    desc: "深度求索 · deepseek-chat / reasoner",
+    defaultModel: "deepseek-chat",
+    modelPlaceholder: "deepseek-chat",
+    showBaseUrl: false,
+    defaultBaseUrl: "https://api.deepseek.com/v1",
+  },
+  {
+    key: "DOUBAO",
+    label: "豆包（火山引擎）",
+    desc: "字节跳动 · doubao-pro / lite 系列",
+    defaultModel: "doubao-pro-32k",
+    modelPlaceholder: "doubao-pro-32k",
+    showBaseUrl: false,
+    defaultBaseUrl: "https://ark.volces.com/api/v3",
+  },
+  {
+    key: "QIANWEN",
+    label: "通义千问",
+    desc: "阿里云 · qwen-plus / max / turbo",
+    defaultModel: "qwen-plus",
+    modelPlaceholder: "qwen-plus",
+    showBaseUrl: false,
+    defaultBaseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  },
+  {
+    key: "MINIMAX",
+    label: "MiniMax",
+    desc: "MiniMax · MiniMax-Text-01 系列",
+    defaultModel: "MiniMax-Text-01",
+    modelPlaceholder: "MiniMax-Text-01",
+    showBaseUrl: false,
+    defaultBaseUrl: "https://api.minimax.chat/v1",
+  },
+  {
+    key: "KIMI",
+    label: "Kimi（月之暗面）",
+    desc: "Moonshot · moonshot-v1-8k / 32k / 128k",
+    defaultModel: "moonshot-v1-8k",
+    modelPlaceholder: "moonshot-v1-8k",
+    showBaseUrl: false,
+    defaultBaseUrl: "https://api.moonshot.cn/v1",
   },
 ];
 
@@ -239,20 +287,26 @@ export function AIConfigShell() {
                     />
                   </div>
 
-                  {/* Base URL (OpenAI-compatible only) */}
-                  {p.showBaseUrl && (
+                  {/* Base URL */}
+                  {(p.showBaseUrl || p.defaultBaseUrl) && (
                     <div className="space-y-1">
                       <Label className="text-xs">
-                        Base URL <span className="text-muted-foreground font-normal">（可选，用于兼容 API）</span>
+                        Base URL{" "}
+                        {p.defaultBaseUrl
+                          ? <span className="text-muted-foreground font-normal">（默认已配置，可覆盖）</span>
+                          : <span className="text-muted-foreground font-normal">（可选，用于兼容 API）</span>}
                       </Label>
                       <Input
-                        placeholder="https://api.openai.com/v1"
+                        placeholder={p.defaultBaseUrl || "https://api.openai.com/v1"}
                         className="h-8 text-sm"
                         value={fs.baseUrl}
                         onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                           updateField(p.key, "baseUrl", e.target.value)
                         }
                       />
+                      {p.defaultBaseUrl && !fs.baseUrl && (
+                        <p className="text-[11px] text-muted-foreground">默认：{p.defaultBaseUrl}</p>
+                      )}
                     </div>
                   )}
 
