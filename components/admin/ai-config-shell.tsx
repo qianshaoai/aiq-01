@@ -166,8 +166,8 @@ export function AIConfigShell() {
         }),
       });
       if (!res.ok) {
-        const d = await res.json();
-        toast.error(d.error ?? "保存失败");
+        const d = await res.json().catch(() => ({}));
+        toast.error((d as { error?: string }).error ?? "保存失败，请稍后重试");
         return;
       }
       toast.success(activate ? "已保存并设为激活供应商" : "配置已保存");

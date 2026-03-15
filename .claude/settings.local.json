@@ -16,7 +16,14 @@
       "Bash(cat:*)",
       "Bash(git pull:*)",
       "Bash(node:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd /c \"taskkill /PID 28396 /F & taskkill /IM node.exe /F & exit 0\")",
+      "Bash(cmd /c \"tasklist | findstr node.exe\")",
+      "Bash(powershell -Command \"Stop-Process -Id 28396 -Force -ErrorAction SilentlyContinue; Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 1; Get-Process -Name node -ErrorAction SilentlyContinue | Select-Object Id,Name\")",
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Select Id,Name,Path\")",
+      "Bash(wmic process:*)",
+      "Bash(netstat:*)"
     ]
   }
 }
