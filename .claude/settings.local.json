@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd:*)",
+      "Bash(which node:*)",
+      "Bash(npm install:*)",
+      "Bash(pnpm:*)",
+      "Bash(ls:*)",
+      "Bash(which gh:*)",
+      "Bash(gh repo:*)",
+      "Bash(git remote:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

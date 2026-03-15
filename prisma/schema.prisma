@@ -1,0 +1,461 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── 企业 ────────────────────────────────────────────────────────────────────
+
+model Enterprise {
+  id                     String   @id @default(cuid())
+  name                   String
+  enterpriseCode         String   @unique
+  enterpriseCodeStatus   EnterpriseCodeStatus @default(ACTIVE)
+  enterpriseCodeUpdatedAt DateTime @default(now())
+  status                 EnterpriseStatus @default(ACTIVE)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  teams        Team[]
+  users        User[]
+  invitations  Invitation[]
+  tasks        Task[]
+  orgAssets    OrgAsset[]
+  notifications Notification[]
+  recycleBin   RecycleBin[]
+  aiConfigs    AIProviderConfig[]
+
+  @@map("enterprises")
+}
+
+enum EnterpriseCodeStatus {
+  ACTIVE
+  DISABLED
+}
+
+enum EnterpriseStatus {
+  ACTIVE
+  DISABLED
+}
+
+// ─── 团队 ────────────────────────────────────────────────────────────────────
+
+model Team {
+  id           String   @id @default(cuid())
+  enterpriseId String
+  name         String
+  status       TeamStatus @default(ACTIVE)
+  leaderUserId String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  enterprise   Enterprise @relation(fields: [enterpriseId], references: [id])
+  members      User[]
+  tasks        Task[]
+  orgAssets    OrgAsset[]
+
+  @@map("teams")
+}
+
+enum TeamStatus {
+  ACTIVE
+  DISABLED
+}
+
+// ─── 用户 ────────────────────────────────────────────────────────────────────
+
+model User {
+  id               String   @id @default(cuid())
+  enterpriseId     String
+  teamId           String?
+  name             String
+  loginAccount     String
+  passwordHash     String
+  role             UserRole @default(MEMBER)
+  positionTag      String?
+  status           UserStatus @default(PENDING)
+  mustChangePassword Boolean @default(false)
+  lastLoginAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  enterprise       Enterprise @relation(fields: [enterpriseId], references: [id])
+  team             Team?      @relation(fields: [teamId], references: [id])
+  tasks            Task[]
+  personalAssets   PersonalAsset[]
+  submittedOrgAssets OrgAsset[]
+  growthReceipts   GrowthReceipt[]
+  aiqRecords       AIQRecord[]
+  notifications    Notification[]
+  sentInvitations  Invitation[] @relation("InvitedBy")
+  recycleBinActions RecycleBin[]
+
+  @@unique([loginAccount, enterpriseId])
+  @@map("users")
+}
+
+enum UserRole {
+  MEMBER
+  TEAM_LEADER
+  ENTERPRISE_ADMIN
+}
+
+enum UserStatus {
+  PENDING            // 待激活
+  PENDING_ASSIGNMENT // 待分配
+  ACTIVE             // 已激活
+  LOCKED             // 已锁定
+  DISABLED           // 已停用
+}
+
+// ─── 邀请 ────────────────────────────────────────────────────────────────────
+
+model Invitation {
+  id             String   @id @default(cuid())
+  enterpriseId   String
+  teamId         String?
+  role           UserRole @default(MEMBER)
+  inviteToken    String   @unique @default(cuid())
+  status         InvitationStatus @default(PENDING)
+  expiresAt      DateTime
+  inviterUserId  String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  enterprise     Enterprise @relation(fields: [enterpriseId], references: [id])
+  inviter        User       @relation("InvitedBy", fields: [inviterUserId], references: [id])
+
+  @@map("invitations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+}
+
+// ─── 任务 ────────────────────────────────────────────────────────────────────
+
+model Task {
+  id                 String   @id @default(cuid())
+  enterpriseId       String
+  teamId             String?
+  creatorUserId      String
+  sourceType         TaskSourceType @default(WAR)
+  taskType           TaskType
+  title              String?
+  summary            String?
+  goal               String?
+  outputType         String?
+  completionCriteria String?
+  status             TaskStatus @default(CREATED)
+  currentStage       String?
+  latestResultId     String?
+  draftContent       String?   // 自动保存草稿 JSON
+  draftSavedAt       DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  archivedAt         DateTime?
+
+  enterprise         Enterprise @relation(fields: [enterpriseId], references: [id])
+  team               Team?      @relation(fields: [teamId], references: [id])
+  creator            User       @relation(fields: [creatorUserId], references: [id])
+  materials          TaskMaterial[]
+  stageRecords       TaskStageRecord[]
+  results            TaskResult[]
+  personalAssets     PersonalAsset[]
+  orgAssets          OrgAsset[]
+  growthReceipts     GrowthReceipt[]
+  aiqRecords         AIQRecord[]
+
+  @@map("tasks")
+}
+
+enum TaskSourceType {
+  WAR      // 战时模式
+  TRAINING // 练兵模式
+  ASSET_DERIVED // 基于资产新建
+}
+
+enum TaskType {
+  PLAN     // 方案类
+  ANALYSIS // 分析类
+  PROCESS  // 流程优化类
+}
+
+enum TaskStatus {
+  CREATED            // 已创建
+  DEFINING           // 框定中
+  PENDING_DIRECTION  // 待确认（方向/结构）
+  EXECUTING          // 执行中
+  PENDING_DRAFT      // 待确认（初稿/阶段结果）
+  COMPLETED          // 已完成
+  ARCHIVED           // 已归档
+  IN_RECYCLE_BIN     // 已进入回收站
+}
+
+// ─── 任务资料 ─────────────────────────────────────────────────────────────────
+
+model TaskMaterial {
+  id               String   @id @default(cuid())
+  taskId           String
+  materialType     MaterialType
+  fileName         String?
+  fileType         String?
+  fileSize         Int?
+  storageKey       String?   // 对象存储 key
+  parseStatus      ParseStatus @default(PENDING)
+  contentExtracted String?   @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  task             Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_materials")
+}
+
+enum MaterialType {
+  TEXT
+  FILE
+}
+
+enum ParseStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+}
+
+// ─── 任务阶段记录 ──────────────────────────────────────────────────────────────
+
+model TaskStageRecord {
+  id        String   @id @default(cuid())
+  taskId    String
+  stageType StageType
+  summary   String?
+  content   String?  @db.Text
+  status    StageRecordStatus @default(PENDING)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  task      Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_stage_records")
+}
+
+enum StageType {
+  DEFINING         // 框定
+  DIRECTION        // 方向确认
+  DRAFT            // 初稿确认
+  DELIVERY         // 结果交付
+}
+
+enum StageRecordStatus {
+  PENDING
+  CONFIRMED
+  REVISED
+}
+
+// ─── 任务结果 ─────────────────────────────────────────────────────────────────
+
+model TaskResult {
+  id         String   @id @default(cuid())
+  taskId     String
+  versionNo  Int      @default(1)
+  resultType String?
+  title      String?
+  summary    String?
+  content    String?  @db.Text
+  status     ResultStatus @default(DRAFT)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  task       Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("task_results")
+}
+
+enum ResultStatus {
+  DRAFT
+  FINAL
+}
+
+// ─── 个人资产 ─────────────────────────────────────────────────────────────────
+
+model PersonalAsset {
+  id           String   @id @default(cuid())
+  enterpriseId String
+  ownerUserId  String
+  sourceTaskId String?
+  assetType    PersonalAssetType
+  title        String
+  summary      String?
+  content      String?  @db.Text
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  owner        User  @relation(fields: [ownerUserId], references: [id])
+  sourceTask   Task? @relation(fields: [sourceTaskId], references: [id])
+
+  @@map("personal_assets")
+}
+
+enum PersonalAssetType {
+  FULL_RESULT   // 完整成果
+  METHOD_CARD   // 方法卡
+  TEMPLATE_CARD // 模板卡
+}
+
+// ─── 组织资产 ─────────────────────────────────────────────────────────────────
+
+model OrgAsset {
+  id             String   @id @default(cuid())
+  enterpriseId   String
+  sourceTaskId   String?
+  sourceTeamId   String?
+  submitterUserId String
+  assetType      OrgAssetType
+  title          String
+  summary        String?
+  content        String?  @db.Text
+  sceneTags      String[] @default([])
+  status         OrgAssetStatus @default(ACTIVE)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  enterprise     Enterprise @relation(fields: [enterpriseId], references: [id])
+  sourceTask     Task?      @relation(fields: [sourceTaskId], references: [id])
+  sourceTeam     Team?      @relation(fields: [sourceTeamId], references: [id])
+  submitter      User       @relation(fields: [submitterUserId], references: [id])
+
+  @@map("org_assets")
+}
+
+enum OrgAssetType {
+  PLAN_TEMPLATE    // 方案模板
+  ANALYSIS_FRAMEWORK // 分析框架
+  PROCESS_SUGGESTION // 流程优化建议
+  SOP_CARD         // SOP 卡片
+}
+
+enum OrgAssetStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+// ─── 成长回执 ─────────────────────────────────────────────────────────────────
+
+model GrowthReceipt {
+  id                    String   @id @default(cuid())
+  taskId                String
+  userId                String
+  summaryOfCompletion   String?
+  strengthSummary       String?
+  weaknessSummary       String?
+  nextActionSuggestion  String?
+  createdAt             DateTime @default(now())
+
+  task                  Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user                  User @relation(fields: [userId], references: [id])
+
+  @@map("growth_receipts")
+}
+
+// ─── AIQ 记录 ─────────────────────────────────────────────────────────────────
+
+model AIQRecord {
+  id           String   @id @default(cuid())
+  userId       String
+  taskId       String
+  dimensionKey String   // e.g. expression / judgment / structure / execution / integration / reflection
+  levelTag     String   // 有提升 / 表现稳定 / 仍可加强
+  explanation  String?
+  createdAt    DateTime @default(now())
+
+  user         User @relation(fields: [userId], references: [id])
+  task         Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@map("aiq_records")
+}
+
+// ─── 通知 ─────────────────────────────────────────────────────────────────────
+
+model Notification {
+  id                String   @id @default(cuid())
+  userId            String
+  enterpriseId      String
+  type              NotificationType
+  title             String
+  content           String
+  category          NotificationCategory @default(INFO)
+  isRead            Boolean  @default(false)
+  isResolved        Boolean  @default(false)
+  relatedEntityType String?
+  relatedEntityId   String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user              User       @relation(fields: [userId], references: [id])
+  enterprise        Enterprise @relation(fields: [enterpriseId], references: [id])
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  PENDING_ACTIVATION   // 待激活
+  PENDING_ASSIGNMENT   // 待分配
+  TASK_PENDING_CONFIRM // 任务待确认
+  RESULT_GENERATED     // 结果已生成
+  TASK_CONTINUABLE     // 可继续处理
+  IMPORT_RESULT        // 批量导入结果
+}
+
+enum NotificationCategory {
+  ACTION_REQUIRED
+  INFO
+}
+
+// ─── 删除缓冲（回收站）───────────────────────────────────────────────────────
+
+model RecycleBin {
+  id              String   @id @default(cuid())
+  enterpriseId    String
+  entityType      String
+  entityId        String
+  deletedByUserId String
+  deletedAt       DateTime @default(now())
+  purgeAt         DateTime
+
+  enterprise      Enterprise @relation(fields: [enterpriseId], references: [id])
+  deletedBy       User       @relation(fields: [deletedByUserId], references: [id])
+
+  @@map("recycle_bin")
+}
+
+// ─── AI 供应商配置 ────────────────────────────────────────────────────────────
+
+model AIProviderConfig {
+  id           String   @id @default(cuid())
+  enterpriseId String
+  provider     AIProvider
+  isActive     Boolean  @default(false)
+  apiKeyEnc    String?  // 加密存储的 API Key
+  modelName    String?
+  baseUrl      String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  enterprise   Enterprise @relation(fields: [enterpriseId], references: [id])
+
+  @@unique([enterpriseId, provider])
+  @@map("ai_provider_configs")
+}
+
+enum AIProvider {
+  ANTHROPIC
+  OPENAI
+  GEMINI
+}
