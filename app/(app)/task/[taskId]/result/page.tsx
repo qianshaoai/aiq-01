@@ -11,13 +11,19 @@ export default async function ResultPage({ params }: Params) {
 
   const { taskId } = await params;
 
-  const task = await prisma.task.findFirst({
-    where: { id: taskId, creatorUserId: user.id },
-    include: {
-      results: { orderBy: { versionNo: "desc" }, take: 1 },
-      stageRecords: { orderBy: { createdAt: "asc" } },
-    },
-  });
+  const [task, growthReceipt] = await Promise.all([
+    prisma.task.findFirst({
+      where: { id: taskId, creatorUserId: user.id },
+      include: {
+        results: { orderBy: { versionNo: "desc" }, take: 1 },
+        stageRecords: { orderBy: { createdAt: "asc" } },
+      },
+    }),
+    prisma.growthReceipt.findFirst({
+      where: { taskId, userId: user.id },
+      select: { id: true },
+    }),
+  ]);
 
   if (!task) notFound();
 
@@ -39,6 +45,7 @@ export default async function ResultPage({ params }: Params) {
         })),
       }}
       result={latestResult}
+      hasGrowthReceipt={!!growthReceipt}
     />
   );
 }

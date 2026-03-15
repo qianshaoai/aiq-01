@@ -7,6 +7,11 @@ const JWT_SECRET = process.env.JWT_SECRET!;
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? "7d";
 const COOKIE_NAME = "aiq_token";
 
+const SUPER_JWT_SECRET = process.env.SUPER_ADMIN_JWT_SECRET ?? process.env.JWT_SECRET!;
+const SUPER_COOKIE_NAME = "aiq_super_token";
+
+// ─── Employee / Manager / Admin JWT ──────────────────────────────────────────
+
 export interface JWTPayload {
   userId: string;
   enterpriseId: string;
@@ -54,5 +59,40 @@ export async function getSessionUser() {
   });
 }
 
+// ─── Super Admin JWT ──────────────────────────────────────────────────────────
+
+export interface SuperAdminJWTPayload {
+  superAdminId: string;
+  email: string;
+}
+
+export function signSuperToken(payload: SuperAdminJWTPayload): string {
+  return jwt.sign(payload, SUPER_JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
+}
+
+export function verifySuperToken(token: string): SuperAdminJWTPayload | null {
+  try {
+    return jwt.verify(token, SUPER_JWT_SECRET) as SuperAdminJWTPayload;
+  } catch {
+    return null;
+  }
+}
+
+export async function getSuperSession(): Promise<SuperAdminJWTPayload | null> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SUPER_COOKIE_NAME)?.value;
+  if (!token) return null;
+  return verifySuperToken(token);
+}
+
+export async function getSuperAdmin() {
+  const session = await getSuperSession();
+  if (!session) return null;
+  return prisma.superAdmin.findUnique({
+    where: { id: session.superAdminId },
+    select: { id: true, name: true, email: true, status: true },
+  });
+}
+
 export const COOKIE_NAME_EXPORT = COOKIE_NAME;
-export { COOKIE_NAME };
+export { COOKIE_NAME, SUPER_COOKIE_NAME };

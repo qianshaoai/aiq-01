@@ -3,9 +3,76 @@ import { decrypt } from "@/lib/crypto";
 import { anthropicStream } from "./adapters/anthropic";
 import { openaiStream } from "./adapters/openai";
 import { geminiStream } from "./adapters/gemini";
-import type { Message, AIProviderSettings } from "./types";
+import type { Message, AIProviderSettings, AgentKeyType } from "./types";
 
 const TIMEOUT_MS = 60_000;
+
+const OUTPUT_STYLE_SUFFIX: Record<string, string> = {
+  FORMAL:   "\n\n请使用正式、专业的语气输出，避免口语化表达。",
+  FRIENDLY: "\n\n请使用友好、平易近人的语气输出。",
+  CONCISE:  "\n\n请尽量简洁，直接给出关键内容，避免冗余。",
+};
+
+export interface PromptVars {
+  task_type?: string;
+  company_name?: string;
+  task_goal?: string;
+  output_type?: string;
+}
+
+function interpolateVars(prompt: string, vars: PromptVars): string {
+  return prompt
+    .replace(/\{\{task_type\}\}/g, vars.task_type ?? "")
+    .replace(/\{\{company_name\}\}/g, vars.company_name ?? "")
+    .replace(/\{\{task_goal\}\}/g, vars.task_goal ?? "")
+    .replace(/\{\{output_type\}\}/g, vars.output_type ?? "");
+}
+
+/**
+ * 根据企业 ID + agentKey 构建系统提示词。
+ * 查找顺序：企业专属配置 → 全局模板 → 传入的 fallback
+ */
+export async function buildAgentSystemPrompt(
+  enterpriseId: string,
+  agentKey: AgentKeyType,
+  fallbackPrompt: string,
+  vars?: PromptVars
+): Promise<string> {
+  // 1. 企业专属配置
+  let agent = await prisma.agent.findFirst({
+    where: { enterpriseId, agentKey, isEnabled: true },
+  });
+
+  // 2. 全局模板兜底
+  if (!agent) {
+    agent = await prisma.agent.findFirst({
+      where: { enterpriseId: null, agentKey, isEnabled: true },
+    });
+  }
+
+  if (!agent) return vars ? interpolateVars(fallbackPrompt, vars) : fallbackPrompt;
+
+  let prompt = agent.systemPrompt?.trim() || fallbackPrompt;
+
+  // 注入知识库（最多 8000 字）
+  if (agent.knowledgeBase?.trim()) {
+    const kb = agent.knowledgeBase.trim().slice(0, 8000);
+    const truncated = agent.knowledgeBase.trim().length > 8000
+      ? `${kb}\n（知识库内容已截断，请管理员精简）`
+      : kb;
+    prompt += `\n\n--- 企业知识库 ---\n${truncated}\n--- 知识库结束 ---`;
+  }
+
+  // 输出风格
+  if (agent.outputStyle && OUTPUT_STYLE_SUFFIX[agent.outputStyle]) {
+    prompt += OUTPUT_STYLE_SUFFIX[agent.outputStyle];
+  }
+
+  // 变量插值
+  if (vars) prompt = interpolateVars(prompt, vars);
+
+  return prompt;
+}
 
 export async function getActiveProviderSettings(
   enterpriseId: string
@@ -33,7 +100,6 @@ export async function* sendMessage(
 ): AsyncIterable<string> {
   let settings = await getActiveProviderSettings(enterpriseId);
 
-  // Chinese providers use OpenAI-compatible APIs — inject default baseUrl if not set
   const OPENAI_COMPAT_BASE_URLS: Partial<Record<typeof settings.provider, string>> = {
     DEEPSEEK: "https://api.deepseek.com/v1",
     DOUBAO:   "https://ark.volces.com/api/v3",
@@ -62,11 +128,8 @@ export async function* sendMessage(
     throw new Error(`不支持的 AI 供应商：${settings.provider}`);
   }
 
-  // 超时包装
   let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-  }, TIMEOUT_MS);
+  const timer = setTimeout(() => { timedOut = true; }, TIMEOUT_MS);
 
   try {
     for await (const chunk of streamFn(messages, systemPrompt, settings)) {

@@ -103,3 +103,22 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/* Markdown rendering in AI chat */
+.md-content p { margin-bottom: 0.5rem; }
+.md-content p:last-child { margin-bottom: 0; }
+.md-content h1, .md-content h2, .md-content h3 { font-weight: 600; margin-top: 0.75rem; margin-bottom: 0.25rem; }
+.md-content h1 { font-size: 1rem; }
+.md-content h2 { font-size: 0.9rem; }
+.md-content h3 { font-size: 0.875rem; }
+.md-content ul { list-style-type: disc; padding-left: 1.25rem; margin-bottom: 0.5rem; }
+.md-content ol { list-style-type: decimal; padding-left: 1.25rem; margin-bottom: 0.5rem; }
+.md-content li { margin-bottom: 0.2rem; }
+.md-content code { background: hsl(var(--muted)); border-radius: 0.25rem; padding: 0.1rem 0.3rem; font-size: 0.8rem; font-family: var(--font-mono); }
+.md-content pre { background: hsl(var(--muted)); border-radius: 0.375rem; padding: 0.75rem; margin-bottom: 0.5rem; overflow-x: auto; }
+.md-content pre code { background: none; padding: 0; font-size: 0.8rem; }
+.md-content blockquote { border-left: 2px solid hsl(var(--border)); padding-left: 0.75rem; color: hsl(var(--muted-foreground)); margin-bottom: 0.5rem; }
+.md-content strong { font-weight: 600; }
+.md-content em { font-style: italic; }
+.md-content a { color: hsl(var(--primary)); text-decoration: underline; }
+.md-content hr { border-color: hsl(var(--border)); margin: 0.75rem 0; }

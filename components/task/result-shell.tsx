@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   Copy, Download, ChevronDown, ChevronUp, ArrowRight,
-  Plus, BookOpen, Building2, CheckCircle2, Clock,
+  Plus, BookOpen, Building2, CheckCircle2, Clock, Sparkles, Loader2,
 } from "lucide-react";
 import type { TaskType, StageType } from "@/lib/generated/prisma/client";
 
@@ -37,6 +37,7 @@ interface ResultShellProps {
     content: string | null;
     versionNo: number;
   } | null;
+  hasGrowthReceipt?: boolean;
 }
 
 const TASK_TYPE_LABELS: Record<TaskType, string> = {
@@ -52,10 +53,28 @@ const STAGE_LABELS: Record<StageType, string> = {
   DELIVERY: "已完成结果交付",
 };
 
-export function ResultShell({ task, result }: ResultShellProps) {
+export function ResultShell({ task, result, hasGrowthReceipt = false }: ResultShellProps) {
   const router = useRouter();
   const [showProcess, setShowProcess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [generatingGrowth, setGeneratingGrowth] = useState(false);
+  const [growthDone, setGrowthDone] = useState(hasGrowthReceipt);
+
+  async function generateGrowthReceipt() {
+    setGeneratingGrowth(true);
+    try {
+      const res = await fetch(`/api/tasks/${task.id}/growth`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      setGrowthDone(true);
+      toast.success("成长回执已生成", {
+        action: { label: "查看", onClick: () => router.push("/growth") },
+      });
+    } catch {
+      toast.error("生成失败，请稍后重试");
+    } finally {
+      setGeneratingGrowth(false);
+    }
+  }
 
   async function copyResult() {
     if (!result?.content) return;
@@ -174,6 +193,44 @@ export function ResultShell({ task, result }: ResultShellProps) {
           <Building2 className="w-3.5 h-3.5 mr-1.5" /> 提交组织资产
         </Button>
       </div>
+
+      {/* 成长回执 */}
+      {!growthDone ? (
+        <Alert className="border-primary/20 bg-primary/5">
+          <Sparkles className="w-4 h-4 text-primary" />
+          <AlertDescription className="flex items-center justify-between gap-3">
+            <span className="text-sm">还没有生成成长回执，AI 将分析本次任务产出你的成长小结</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-shrink-0 h-7 text-xs"
+              onClick={generateGrowthReceipt}
+              disabled={generatingGrowth}
+            >
+              {generatingGrowth ? (
+                <><Loader2 className="w-3 h-3 mr-1 animate-spin" />生成中…</>
+              ) : (
+                <><Sparkles className="w-3 h-3 mr-1" />生成成长回执</>
+              )}
+            </Button>
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert className="border-emerald-200 bg-emerald-50">
+          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+          <AlertDescription className="flex items-center justify-between gap-3">
+            <span className="text-sm text-emerald-700">成长回执已生成</span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-shrink-0 h-7 text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-100"
+              onClick={() => router.push("/growth")}
+            >
+              查看成长反馈 <ArrowRight className="w-3 h-3 ml-1" />
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Separator />
 

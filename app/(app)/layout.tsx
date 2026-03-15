@@ -15,6 +15,14 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login?error=account_inactive");
   }
 
+  // 角色验证：非普通员工重定向到对应后台
+  if (user.role === "TEAM_LEADER") {
+    redirect("/manager/dashboard");
+  }
+  if (user.role === "ENTERPRISE_ADMIN") {
+    redirect("/admin/dashboard");
+  }
+
   // 未激活/待分配用户只能访问受限页面
   // 前端会根据 status 展示受限提示，这里允许进入，由各页面自行判断
 
@@ -23,24 +31,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     where: { userId: user.id, isRead: false },
   });
 
-  // 管理端待处理数（团队负责人/管理员）
-  let pendingCount = 0;
-  if (user.role === "TEAM_LEADER" || user.role === "ENTERPRISE_ADMIN") {
-    pendingCount = await prisma.user.count({
-      where: {
-        enterpriseId: user.enterpriseId,
-        status: { in: ["PENDING", "PENDING_ASSIGNMENT"] },
-      },
-    });
-  }
+  const pendingCount = 0;
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <SidebarNav
-        role={user.role}
         userName={user.name}
         enterpriseName={user.enterprise.name}
-        pendingCount={pendingCount}
       />
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopBar initialUnreadCount={unreadCount} />

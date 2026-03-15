@@ -35,6 +35,14 @@ export async function POST(req: NextRequest) {
     return apiError("账号已锁定，请联系企业管理员");
   }
 
+  if (user.role === "TEAM_LEADER") {
+    return apiError("团队管理者请使用专属入口登录：/manager/login");
+  }
+
+  if (user.role === "ENTERPRISE_ADMIN") {
+    return apiError("企业管理员请使用专属入口登录：/admin/login");
+  }
+
   const valid = await bcrypt.compare(password, user.passwordHash);
   if (!valid) {
     return apiError("账号或密码错误");

@@ -27,6 +27,7 @@ model Enterprise {
   notifications Notification[]
   recycleBin   RecycleBin[]
   aiConfigs    AIProviderConfig[]
+  agents       Agent[]
 
   @@map("enterprises")
 }
@@ -463,4 +464,86 @@ enum AIProvider {
   QIANWEN
   MINIMAX
   KIMI
+}
+
+// ─── 超级管理员 ───────────────────────────────────────────────────────────────
+
+model SuperAdmin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  status       SuperAdminStatus @default(ACTIVE)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("super_admins")
+}
+
+enum SuperAdminStatus {
+  ACTIVE
+  DISABLED
+}
+
+// ─── 智能体配置 ───────────────────────────────────────────────────────────────
+
+model Agent {
+  id           String    @id @default(cuid())
+  enterpriseId String?   // null 表示超级管理员的全局模板
+  agentKey     AgentKey
+  name         String
+  systemPrompt String?   @db.Text
+  knowledgeBase String?  @db.Text
+  outputStyle  AgentOutputStyle @default(FRIENDLY)
+  isEnabled    Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  enterprise   Enterprise? @relation(fields: [enterpriseId], references: [id])
+
+  @@unique([enterpriseId, agentKey])
+  @@map("agents")
+}
+
+enum AgentKey {
+  TASK_UNDERSTANDING  // 任务理解师 — 框定阶段
+  DIRECTION_PLANNING  // 方向规划师 — 方向确认断点
+  EXECUTION           // 方案执行师 — 主执行阶段
+  REVIEW              // 质量评审师 — 初稿确认断点
+  DELIVERY            // 成果交付师 — 结果交付阶段
+  TRAINING            // 练兵教练 — 练兵模式全程
+}
+
+enum AgentOutputStyle {
+  FORMAL    // 正式
+  FRIENDLY  // 友好
+  CONCISE   // 简洁
+}
+
+// ─── 平台全局配置 ─────────────────────────────────────────────────────────────
+
+model PlatformConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String?  @db.Text
+  updatedAt DateTime @updatedAt
+  updatedBy String?  // SuperAdmin id
+
+  @@map("platform_configs")
+}
+
+// ─── 系统公告 ─────────────────────────────────────────────────────────────────
+
+model Announcement {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  validFrom   DateTime @default(now())
+  validUntil  DateTime?
+  createdBy   String   // SuperAdmin id
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("announcements")
 }

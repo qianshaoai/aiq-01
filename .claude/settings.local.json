@@ -23,7 +23,12 @@
       "Bash(powershell -Command \"Stop-Process -Id 28396 -Force -ErrorAction SilentlyContinue; Get-Process -Name node -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 1; Get-Process -Name node -ErrorAction SilentlyContinue | Select-Object Id,Name\")",
       "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Select Id,Name,Path\")",
       "Bash(wmic process:*)",
-      "Bash(netstat:*)"
+      "Bash(netstat:*)",
+      "Bash(cmd /c \"taskkill /PID 30128 /F 2>nul & taskkill /IM node.exe /F 2>nul & exit 0\")",
+      "Bash(cmd /c \"taskkill /IM node.exe /F 2>nul & exit 0\")",
+      "Bash(grep:*)",
+      "Bash(curl:*)",
+      "Bash(powershell -Command \"Invoke-WebRequest -Uri 'http://localhost:3000/manager/login' -UseBasicParsing | Select-Object -ExpandProperty StatusCode\" 2>&1)"
     ]
   }
 }

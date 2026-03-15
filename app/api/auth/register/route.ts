@@ -34,39 +34,39 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const user = await prisma.user.create({
-    data: {
-      enterpriseId: enterprise.id,
-      name,
-      loginAccount,
-      passwordHash,
-      status: "PENDING",
-      role: "MEMBER",
-    },
-  });
-
-  // 7 天未激活自动锁定的调度可由 cron 完成，此处记录创建时间即可
-
-  // 通知企业管理员
+  // Find admins before transaction (read-only, safe outside tx)
   const admins = await prisma.user.findMany({
     where: { enterpriseId: enterprise.id, role: "ENTERPRISE_ADMIN", status: "ACTIVE" },
     select: { id: true },
   });
 
-  if (admins.length > 0) {
-    await prisma.notification.createMany({
-      data: admins.map((admin) => ({
-        userId: admin.id,
+  await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
         enterpriseId: enterprise.id,
-        type: "PENDING_ACTIVATION" as const,
-        title: "有新成员待激活",
-        content: `${name}（${loginAccount}）已注册，等待激活`,
-        category: "ACTION_REQUIRED" as const,
-        relatedEntityType: "User",
-        relatedEntityId: user.id,
-      })),
+        name,
+        loginAccount,
+        passwordHash,
+        status: "PENDING",
+        role: "MEMBER",
+      },
     });
-  }
+
+    if (admins.length > 0) {
+      await tx.notification.createMany({
+        data: admins.map((admin) => ({
+          userId: admin.id,
+          enterpriseId: enterprise.id,
+          type: "PENDING_ACTIVATION" as const,
+          title: "有新成员待激活",
+          content: `${name}（${loginAccount}）已注册，等待激活`,
+          category: "ACTION_REQUIRED" as const,
+          relatedEntityType: "User",
+          relatedEntityId: user.id,
+        })),
+      });
+    }
+  });
 
   return NextResponse.json({ ok: true });
 }

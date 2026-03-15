@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, ArrowRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ChevronDown, ChevronUp, ArrowRight, BookOpen } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -185,6 +186,37 @@ function AIQSummaryCard({ dimensionSummary }: { dimensionSummary: DimensionSumma
 
 function ReceiptCard({ receipt }: { receipt: GrowthReceipt }) {
   const [expanded, setExpanded] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function saveAsPersonalAsset() {
+    setSaving(true);
+    try {
+      const content = [
+        receipt.summaryOfCompletion ? `【完成情况】\n${receipt.summaryOfCompletion}` : "",
+        receipt.strengthSummary ? `【优势表现】\n${receipt.strengthSummary}` : "",
+        receipt.weaknessSummary ? `【待提升方向】\n${receipt.weaknessSummary}` : "",
+        receipt.nextActionSuggestion ? `【下一步建议】\n${receipt.nextActionSuggestion}` : "",
+      ].filter(Boolean).join("\n\n");
+
+      const res = await fetch("/api/assets/personal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sourceTaskId: receipt.task.id,
+          assetType: "FULL_RESULT",
+          title: `成长回执 · ${receipt.task.title ?? "无标题任务"}`,
+          summary: receipt.summaryOfCompletion ?? "成长小结",
+          content,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success("已保存到个人资产");
+    } catch {
+      toast.error("保存失败，请重试");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="rounded-lg border border-border bg-white p-4">
@@ -235,12 +267,22 @@ function ReceiptCard({ receipt }: { receipt: GrowthReceipt }) {
               <p className="text-sm leading-relaxed">{receipt.nextActionSuggestion}</p>
             </div>
           )}
-          <Link
-            href={`/task/new?baseTaskId=${receipt.task.id}`}
-            className="inline-flex items-center gap-1 text-xs text-primary hover:underline mt-1"
-          >
-            基于此成果开新任务 <ArrowRight className="w-3 h-3" />
-          </Link>
+          <div className="flex items-center gap-3 pt-1">
+            <Link
+              href={`/task/new?baseTaskId=${receipt.task.id}`}
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              基于此成果开新任务 <ArrowRight className="w-3 h-3" />
+            </Link>
+            <button
+              onClick={saveAsPersonalAsset}
+              disabled={saving}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+            >
+              <BookOpen className="w-3 h-3" />
+              {saving ? "保存中..." : "保存为个人资产"}
+            </button>
+          </div>
         </div>
       )}
     </div>

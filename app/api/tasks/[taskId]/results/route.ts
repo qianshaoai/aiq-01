@@ -26,22 +26,23 @@ export async function POST(req: NextRequest, { params }: Params) {
     select: { versionNo: true },
   });
 
-  const result = await prisma.taskResult.create({
-    data: {
-      taskId,
-      versionNo: (latest?.versionNo ?? 0) + 1,
-      title: title ?? null,
-      summary: summary ?? null,
-      content: content ?? null,
-      resultType: resultType ?? null,
-      status: status ?? "DRAFT",
-    },
-  });
-
-  // 更新任务的 latestResultId
-  await prisma.task.update({
-    where: { id: taskId },
-    data: { latestResultId: result.id },
+  const result = await prisma.$transaction(async (tx) => {
+    const created = await tx.taskResult.create({
+      data: {
+        taskId,
+        versionNo: (latest?.versionNo ?? 0) + 1,
+        title: title ?? null,
+        summary: summary ?? null,
+        content: content ?? null,
+        resultType: resultType ?? null,
+        status: status ?? "DRAFT",
+      },
+    });
+    await tx.task.update({
+      where: { id: taskId },
+      data: { latestResultId: created.id },
+    });
+    return created;
   });
 
   return NextResponse.json({ result });

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import {
   FileText, BarChart2, GitBranch, Upload, X, AlertCircle,
-  ChevronRight, CheckCircle2, Loader2,
+  ChevronRight, CheckCircle2, Loader2, BookOpen,
 } from "lucide-react";
 
 type Step = "input" | "define" | "confirm";
@@ -39,6 +39,12 @@ const TASK_TYPE_META: Record<TaskType, { label: string; icon: React.ElementType;
   },
 };
 
+interface AssetInfo {
+  title: string;
+  content: string | null;
+  assetType: string;
+}
+
 interface TaskNewShellProps {
   userId: string;
   enterpriseId: string;
@@ -50,6 +56,8 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
 
   const modeParam = params.get("mode") as "war" | "training" | null;
   const typeParam = params.get("type") as TaskType | null;
+  const assetIdParam = params.get("assetId");
+  const orgAssetIdParam = params.get("orgAssetId");
 
   const [step, setStep] = useState<Step>("input");
   const [taskType, setTaskType] = useState<TaskType | null>(typeParam);
@@ -64,20 +72,47 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
   const [files, setFiles] = useState<File[]>([]);
   const [loading, setLoading] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
+  const [assetInfo, setAssetInfo] = useState<AssetInfo | null>(null);
+  const [assetLoading, setAssetLoading] = useState(false);
 
   // 如果通过快捷入口进入且已知类型，直接跳到框定步骤
   useEffect(() => {
     if (typeParam) setStep("define");
   }, [typeParam]);
 
+  // 如果从资产入口进来，加载资产并直接进入框定步骤
+  useEffect(() => {
+    if (assetIdParam) {
+      loadAsset(`/api/assets/personal/${assetIdParam}`);
+    } else if (orgAssetIdParam) {
+      loadAsset(`/api/assets/org/${orgAssetIdParam}`);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetIdParam, orgAssetIdParam]);
+
+  async function loadAsset(url: string) {
+    setAssetLoading(true);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) { toast.error("资产加载失败"); return; }
+      const data = await res.json();
+      const asset = data.asset;
+      setAssetInfo({ title: asset.title, content: asset.content ?? null, assetType: asset.assetType });
+      setStep("define");
+    } catch {
+      toast.error("资产加载失败");
+    } finally {
+      setAssetLoading(false);
+    }
+  }
+
   async function handleFreeInputNext() {
     if (!freeInput.trim()) {
       toast.error("请描述你要解决的问题");
       return;
     }
-    // 用输入内容预填 goal
     setForm((f) => ({ ...f, goal: freeInput }));
-    if (!taskType) setTaskType("PLAN"); // 默认，用户可修改
+    if (!taskType) setTaskType("PLAN");
     setStep("define");
   }
 
@@ -89,12 +124,16 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
     setLoading(true);
     try {
       // 1. 创建任务
+      const sourceType = assetInfo
+        ? "ASSET_DERIVED"
+        : modeParam === "training" ? "TRAINING" : "WAR";
+
       const res = await fetch("/api/tasks", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           taskType,
-          sourceType: modeParam === "training" ? "TRAINING" : "WAR",
+          sourceType,
           title: form.title || form.goal.slice(0, 50),
           goal: form.goal,
           outputType: form.outputType,
@@ -109,7 +148,20 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
       const { task } = await res.json();
       setTaskId(task.id);
 
-      // 2. 上传背景资料（文字）
+      // 2. 上传来源资产（存为带标记 fileName 的 TEXT material）
+      if (assetInfo?.content) {
+        await fetch(`/api/tasks/${task.id}/materials`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            materialType: "TEXT",
+            content: assetInfo.content,
+            fileName: `【资产】${assetInfo.title}`,
+          }),
+        });
+      }
+
+      // 3. 上传背景资料（文字）
       if (form.backgroundText.trim()) {
         await fetch(`/api/tasks/${task.id}/materials`, {
           method: "POST",
@@ -118,7 +170,7 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
         });
       }
 
-      // 3. 上传文件（如有）
+      // 4. 上传文件（如有）
       for (const file of files) {
         const fd = new FormData();
         fd.append("file", file);
@@ -128,7 +180,7 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
         });
       }
 
-      // 4. 更新任务状态为框定完成
+      // 5. 更新任务状态为框定完成
       await fetch(`/api/tasks/${task.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -145,7 +197,6 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
 
   async function handleStartExecution() {
     if (!taskId) return;
-    // 更新状态并跳转执行台
     await fetch(`/api/tasks/${taskId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -167,6 +218,16 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
     }
     setFiles((prev) => [...prev, ...newFiles]);
     e.target.value = "";
+  }
+
+  // ── 资产加载中 ────────────────────────────────────────────────────────────
+  if (assetLoading) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-16 flex flex-col items-center gap-3">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">正在加载资产…</p>
+      </div>
+    );
   }
 
   // ── Step 1: 自由输入 ──────────────────────────────────────────────────────
@@ -236,6 +297,17 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
           <p className="text-sm text-muted-foreground">把任务说清楚，AI 才能帮你做得准</p>
         </div>
 
+        {/* 来源资产 banner */}
+        {assetInfo && (
+          <Alert className="mb-5 border-primary/20 bg-primary/5">
+            <BookOpen className="h-4 w-4 text-primary" />
+            <AlertDescription className="text-sm">
+              已加载资产：<span className="font-medium">{assetInfo.title}</span>
+              <span className="text-muted-foreground ml-1.5">— AI 将基于此资产内容为你推进任务</span>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-5">
           {/* 任务类型（可修改） */}
           <div className="space-y-1.5">
@@ -289,11 +361,11 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
             />
           </div>
 
-          {/* 背景资料 */}
+          {/* 背景资料（来源资产已自动加载，此处为追加说明） */}
           <div className="space-y-1.5">
-            <Label>背景资料</Label>
+            <Label>{assetInfo ? "追加背景资料（可选）" : "背景资料"}</Label>
             <Textarea
-              placeholder="粘贴相关文字资料（可选）"
+              placeholder={assetInfo ? "可在资产内容基础上补充额外背景（可选）" : "粘贴相关文字资料（可选）"}
               className="min-h-24 resize-none text-sm"
               value={form.backgroundText}
               onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setForm({ ...form, backgroundText: e.target.value })}
@@ -332,8 +404,8 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
             )}
           </div>
 
-          {/* 资料不足提示 */}
-          {!form.backgroundText.trim() && files.length === 0 && (
+          {/* 无背景资料提示（来源资产本身算有资料） */}
+          {!assetInfo && !form.backgroundText.trim() && files.length === 0 && (
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription className="text-xs">
@@ -378,17 +450,20 @@ export function TaskNewShell({ userId, enterpriseId }: TaskNewShellProps) {
           </div>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
+          {assetInfo && <Row label="来源资产" value={assetInfo.title} />}
           <Row label="任务目标" value={form.goal} />
           <Row label="输出形式" value={form.outputType} />
           {form.completionCriteria && <Row label="完成标准" value={form.completionCriteria} />}
           <Row
             label="背景资料"
             value={
-              form.backgroundText
-                ? `${form.backgroundText.slice(0, 80)}${form.backgroundText.length > 80 ? "…" : ""}`
-                : files.length > 0
-                ? `${files.length} 个文件`
-                : "（未提供）"
+              assetInfo
+                ? `${assetInfo.title}${form.backgroundText ? " + 追加资料" : ""}${files.length > 0 ? ` + ${files.length} 个文件` : ""}`
+                : form.backgroundText
+                  ? `${form.backgroundText.slice(0, 80)}${form.backgroundText.length > 80 ? "…" : ""}`
+                  : files.length > 0
+                    ? `${files.length} 个文件`
+                    : "（未提供）"
             }
           />
           <Row label="当前状态" value="框定完成，等待确认" />

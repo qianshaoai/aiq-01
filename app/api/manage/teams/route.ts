@@ -29,21 +29,22 @@ export async function POST(req: NextRequest) {
   const { name, leaderUserId } = await req.json();
   if (!name?.trim()) return apiError("请填写团队名称");
 
-  const team = await prisma.team.create({
-    data: {
-      enterpriseId: session.enterpriseId,
-      name: name.trim(),
-      leaderUserId: leaderUserId ?? null,
-    },
-  });
-
-  // 若指定了负责人，同步更新用户角色
-  if (leaderUserId) {
-    await prisma.user.update({
-      where: { id: leaderUserId },
-      data: { role: "TEAM_LEADER", teamId: team.id },
+  const team = await prisma.$transaction(async (tx) => {
+    const created = await tx.team.create({
+      data: {
+        enterpriseId: session.enterpriseId,
+        name: name.trim(),
+        leaderUserId: leaderUserId ?? null,
+      },
     });
-  }
+    if (leaderUserId) {
+      await tx.user.update({
+        where: { id: leaderUserId },
+        data: { role: "TEAM_LEADER", teamId: created.id },
+      });
+    }
+    return created;
+  });
 
   return NextResponse.json({ team });
 }
