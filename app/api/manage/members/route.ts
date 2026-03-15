@@ -10,18 +10,30 @@ export async function GET(req: NextRequest) {
   if (session.role === "MEMBER") return apiForbidden();
 
   const status = req.nextUrl.searchParams.get("status");
+  const search = req.nextUrl.searchParams.get("q");
   const page = parseInt(req.nextUrl.searchParams.get("page") ?? "1");
   const pageSize = 20;
 
   const where: Record<string, unknown> = {
     enterpriseId: session.enterpriseId,
     id: { not: session.userId },
+    // 默认排除回收站状态（无此状态）；显示所有成员
+    status: { not: "IN_RECYCLE_BIN" as const },
   };
 
-  if (status) {
-    where.status = status;
-  } else {
+  // 指定 status 时精确过滤（支持逗号分隔的多值，如 "PENDING,PENDING_ASSIGNMENT"）
+  if (status === "pending") {
     where.status = { in: ["PENDING", "PENDING_ASSIGNMENT"] };
+  } else if (status) {
+    where.status = status;
+  }
+
+  // 姓名或账号搜索
+  if (search) {
+    where.OR = [
+      { name: { contains: search, mode: "insensitive" } },
+      { loginAccount: { contains: search, mode: "insensitive" } },
+    ];
   }
 
   // 团队负责人只看本团队（待分配成员没有团队，也应显示）

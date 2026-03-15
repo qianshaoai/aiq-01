@@ -17,10 +17,14 @@ export async function GET(req: NextRequest) {
 
   const where: Record<string, unknown> = {
     creatorUserId: session.userId,
-    status: { not: "IN_RECYCLE_BIN" },
   };
 
-  if (status) where.status = status;
+  // 指定 status 时精确过滤；否则排除回收站
+  if (status) {
+    where.status = status;
+  } else {
+    where.status = { not: "IN_RECYCLE_BIN" };
+  }
   if (taskType) where.taskType = taskType;
   if (sourceType) where.sourceType = sourceType;
   if (search) {
@@ -69,10 +73,16 @@ export async function POST(req: NextRequest) {
 
   if (!taskType) return apiError("请选择任务类型");
 
+  // 先查用户 teamId，在事务中一次性创建任务（避免两次写入不一致）
+  const creator = await prisma.user.findUnique({
+    where: { id: session.userId },
+    select: { teamId: true },
+  });
+
   const task = await prisma.task.create({
     data: {
       enterpriseId: session.enterpriseId,
-      teamId: null, // 从 user.teamId 填入
+      teamId: creator?.teamId ?? null,
       creatorUserId: session.userId,
       taskType,
       sourceType: sourceType ?? "WAR",
@@ -84,18 +94,6 @@ export async function POST(req: NextRequest) {
       status: "CREATED",
     },
   });
-
-  // 更新 teamId
-  const user = await prisma.user.findUnique({
-    where: { id: session.userId },
-    select: { teamId: true },
-  });
-  if (user?.teamId) {
-    await prisma.task.update({
-      where: { id: task.id },
-      data: { teamId: user.teamId },
-    });
-  }
 
   return NextResponse.json({ task });
 }

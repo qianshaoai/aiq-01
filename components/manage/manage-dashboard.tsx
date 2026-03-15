@@ -317,19 +317,20 @@ function MembersTab() {
     }
   }
 
-  async function action(userId: string, act: string) {
+  async function action(userId: string, act: string, extra?: Record<string, unknown>) {
     setActing(userId + act);
     try {
       const res = await fetch("/api/manage/members", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, action: act }),
+        body: JSON.stringify({ userId, action: act, ...extra }),
       });
       if (!res.ok) { toast.error((await res.json()).error ?? "操作失败"); return; }
       toast.success("操作成功");
       fetchMembers();
     } finally {
-      setActing(null); }
+      setActing(null);
+    }
   }
 
   const pageSize = 20;
@@ -401,7 +402,7 @@ function MembersTab() {
                       variant="outline"
                       className="h-7 text-xs"
                       disabled={!!acting}
-                      onClick={() => action(m.id, "change_role")}
+                      onClick={() => action(m.id, "change_role", { role: "TEAM_LEADER" })}
                     >
                       设为负责人
                     </Button>
@@ -482,7 +483,8 @@ function TeamsTab({ initialTeams, role }: { initialTeams: Team[]; role: UserRole
       });
       if (!res.ok) { toast.error((await res.json()).error ?? "生成失败"); return; }
       const data = await res.json();
-      const link = `${window.location.origin}/invite?token=${data.token}`;
+      // API returns inviteUrl directly
+      const link = data.inviteUrl as string;
       setInviteLink(link);
       await navigator.clipboard.writeText(link).catch(() => {});
       toast.success("邀请链接已复制到剪贴板");

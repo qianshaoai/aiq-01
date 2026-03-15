@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { COOKIE_NAME } from "@/lib/auth";
 
-export async function POST() {
-  const response = NextResponse.redirect(new URL("/login", process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"));
+export async function POST(req: NextRequest) {
+  const response = NextResponse.redirect(new URL("/login", req.url));
   response.cookies.delete(COOKIE_NAME);
   return response;
 }
