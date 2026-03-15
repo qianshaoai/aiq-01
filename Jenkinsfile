@@ -41,6 +41,13 @@ pipeline {
             }
         }
 
+        stage('Generate Prisma Client') {
+            steps {
+                echo "==> 生成 Prisma Client"
+                sh 'pnpm prisma generate'
+            }
+        }
+
         stage('Build') {
             steps {
                 echo "==> 构建 Next.js（standalone 模式）"
